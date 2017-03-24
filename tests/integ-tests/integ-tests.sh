@@ -12,6 +12,7 @@ echo "alias q='exit'" > ~/.config/kyrat/bashrc
 ./bin/kyrat -o "StrictHostKeyChecking no" localhost -- echo \$SHELL
 ./bin/kyrat -v -o "StrictHostKeyChecking no" localhost -- q
 ./bin/kyrat -v -o "StrictHostKeyChecking no" localhost -- ls -lh
+./bin/kyrat -v -o "StrictHostKeyChecking no" localhost -- [[ ! -z "\\\$GIT_CONFIG" ]]
 ./bin/kyrat -v -o "StrictHostKeyChecking no" localhost -- [[ ! -z "\\\$INPUTRC" ]]
 ./bin/kyrat -v -o "StrictHostKeyChecking no" localhost -- [[ ! -z "\\\$VIMINIT" ]]
 

@@ -91,6 +91,8 @@ function test_kyrat(){
     assertEquals "$(echo -e "parse localhost\nexecute")" "$(cat $STDOUTF)"
     [[ -d $KYRAT_HOME/bashrc.d ]]
     assertEquals 0 $?
+    [[ -d $KYRAT_HOME/gitconfig.d ]]
+    assertEquals 0 $?
     [[ -d $KYRAT_HOME/inputrc.d ]]
     assertEquals 0 $?
     [[ -d $KYRAT_HOME/vimrc.d ]]
@@ -137,6 +139,7 @@ function test_execute_ssh_no_opts(){
 
 function test_get_remote_command_no_command(){
     echo "bashrc" > $KYRAT_HOME/bashrc
+    echo "gitconfig" > $KYRAT_HOME/gitconfig
     echo "inputrc" > $KYRAT_HOME/inputrc
     echo "vimrc" > $KYRAT_HOME/vimrc
     COMMANDS=()
@@ -144,6 +147,7 @@ function test_get_remote_command_no_command(){
         local kyrat_home=$(echo "$2" | sed 's/\/bashrc//')
         assertEquals "--rcfile $kyrat_home/bashrc -i" "$(echo "$@")"
         assertEquals "bashrc" "$(cat $kyrat_home/bashrc)"
+        assertEquals "gitconfig" "$(cat $kyrat_home/gitconfig)"
         assertEquals "inputrc" "$(cat $kyrat_home/inputrc)"
         assertEquals "vimrc" "$(cat $kyrat_home/vimrc)"
         assertEquals "$kyrat_home/inputrc" "$INPUTRC"
@@ -162,6 +166,7 @@ function test_get_remote_command_no_command(){
 
 function test_get_remote_command(){
     echo "bashrc" > $KYRAT_HOME/bashrc
+    echo "gitconfig" > $KYRAT_HOME/gitconfig
     echo "inputrc" > $KYRAT_HOME/inputrc
     echo "vimrc" > $KYRAT_HOME/vimrc
     COMMANDS=("mycommand -la")
@@ -169,8 +174,10 @@ function test_get_remote_command(){
         local kyrat_home=$(echo "$2" | sed 's/\/bashrc//')
         assertEquals "--rcfile $kyrat_home/bashrc -i -c mycommand -la" "$(echo "$@")"
         assertEquals "bashrc" "$(cat $kyrat_home/bashrc)"
+        assertEquals "gitconfig" "$(cat $kyrat_home/gitconfig)"
         assertEquals "inputrc" "$(cat $kyrat_home/inputrc)"
         assertEquals "vimrc" "$(cat $kyrat_home/vimrc)"
+        assertEquals "$kyrat_home/gitconfig" "$GIT_CONFIG"
         assertEquals "$kyrat_home/inputrc" "$INPUTRC"
         assertEquals "let \$MYVIMRC=\"$kyrat_home/vimrc\" | source \$MYVIMRC" "$VIMINIT"
         echo "$kyrat_home"
@@ -202,6 +209,7 @@ function test_get_remote_command_nested(){
 
 function test_get_remote_command_no_base64(){
     echo "bashrc" > $KYRAT_HOME/bashrc
+    echo "gitconfig" > $KYRAT_HOME/gitconfig
     echo "inputrc" > $KYRAT_HOME/inputrc
     echo "vimrc" > $KYRAT_HOME/vimrc
     BASE64="not-exist"
@@ -215,6 +223,7 @@ function test_get_remote_command_no_base64(){
 
 function test_get_remote_command_no_gunzip(){
     echo "bashrc" > $KYRAT_HOME/bashrc
+    echo "gitconfig" > $KYRAT_HOME/gitconfig
     echo "inputrc" > $KYRAT_HOME/inputrc
     echo "vimrc" > $KYRAT_HOME/vimrc
     GUNZIP="not-exist"
@@ -228,6 +237,7 @@ function test_get_remote_command_no_gunzip(){
 
 function test_get_remote_command_no_base_dirs(){
     echo "bashrc" > $KYRAT_HOME/bashrc
+    echo "gitconfig" > $KYRAT_HOME/gitconfig
     echo "inputrc" > $KYRAT_HOME/inputrc
     echo "vimrc" > $KYRAT_HOME/vimrc
     BASE_DIRS=("/")

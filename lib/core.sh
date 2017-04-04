@@ -59,6 +59,7 @@ function _concatenate_files(){
 function kyrat(){
     mkdir -p $KYRAT_HOME/bashrc.d
     mkdir -p $KYRAT_HOME/inputrc.d
+    mkdir -p $KYRAT_HOME/symlinkhome
     mkdir -p $KYRAT_HOME/vimrc.d
     _parse_args "$@"
     _execute_ssh
@@ -154,11 +155,52 @@ function _get_remote_command(){
         command -v $BASE64 >/dev/null 2>&1 || { echo >&2 \"kyrat requires $BASE64 command on the remote host. Aborting.\"; exit $NOT_EXISTING_COMMAND; };
         command -v $GUNZIP >/dev/null 2>&1 || { echo >&2 \"kyrat requires $GUNZIP command on the remote host. Aborting.\"; exit $NOT_EXISTING_COMMAND; };
         kyrat_home=\"\$(mktemp -d kyrat-XXXXX -p \"\$base_dir\")\";
-        trap \"rm -rf \"\$kyrat_home\"; exit\" EXIT HUP INT QUIT PIPE TERM KILL;
         echo \"${rc_script}\" | $BASE64 -di | $GUNZIP > \"\${kyrat_home}/bashrc\";
         echo \"${inputrc_script}\" | $BASE64 -di | $GUNZIP > \"\${kyrat_home}/inputrc\";
         echo \"${vimrc_script}\" | $BASE64 -di | $GUNZIP > \"\${kyrat_home}/vimrc\";
+        kyrat_symlinks=();
+        $(_get_remote_command_symlinks)
+        trap \"rm -rf -- \\\"\$kyrat_home\\\"; for kyrat_symlink in \\\"\\\${kyrat_symlinks[@]}\\\"; do [[ -L \\\"\\\$kyrat_symlink\\\" ]] && [[ ! -e \\\"\\\$kyrat_symlink\\\" ]] && [[ \\\"\\\$(readlink -- \\\"\\\$kyrat_symlink\\\")\\\" == */kyrat-* ]] && rm \\\"\\\$kyrat_symlink\\\"; done; exit\" EXIT HUP INT QUIT PIPE TERM KILL;
         VIMINIT=\"let \\\$MYVIMRC=\\\"\${kyrat_home}/vimrc\\\" | source \\\$MYVIMRC\" INPUTRC=\"\${kyrat_home}/inputrc\" $BASH --rcfile \"\${kyrat_home}/bashrc\" -i ${commands_opt};
     "
     echo "$cmd"
+}
+
+#######################################
+# Compose and return the part of the
+# remote command that symlinks files to
+# the $HOME directory.
+#
+# Globals:
+#   KYRAT_HOME (RO)       : Kyrat home location.
+#   BASE64 (RO)           : base64 command.
+#   GZIP (RO)             : gzip command.
+#   GUNZIP (RO)           : gunzip command.
+#   HOME [remote] (RO)    : User's remote $HOME.
+# Arguments:
+#   None
+# Returns:
+#   None
+# Output:
+#   The composed command to be included
+#   in the remote command.
+#######################################
+function _get_remote_command_symlinks() {
+    local filepath
+    if cd "$KYRAT_HOME/symlinkhome" 2>/dev/null; then
+        for filepath in * .*
+            do
+                [[ -f "$filepath" ]] || continue
+                echo "
+                    echo \"$(cat "$KYRAT_HOME/symlinkhome/$filepath" | $GZIP | $BASE64)\" | $BASE64 -di | $GUNZIP > \"\${kyrat_home}/$filepath\";
+                    if [[ ! -e \"\${HOME}/$filepath\" ]]; then
+                        if [[ ! -L \"\${HOME}/$filepath\" ]] || [[ \"\$(readlink -- \"\${HOME}/$filepath\")\" == */kyrat-* ]]; then
+                            ln -snf \"\${kyrat_home}/$filepath\" \"\${HOME}/$filepath\";
+                            kyrat_symlinks+=(\"\${HOME}/$filepath\");
+                        fi
+                    fi;
+                "
+            done
+        cd - >/dev/null
+    fi
 }

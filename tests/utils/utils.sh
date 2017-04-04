@@ -1,10 +1,19 @@
 function kyratSetUp() {
     export KYRAT_HOME=$(TMPDIR=/tmp mktemp -d -t kyrat-test-home.XXXXXXX)
+    # should not match */kyrat-*
+    export HOME=$(TMPDIR=/tmp mktemp -d -t user-kyrat-test-home.XXXXXXX)
 }
 
 function kyratTearDown(){
     rm -rf $KYRAT_HOME
     unset KYRAT_HOME
+    if [[ "$HOME" == "/tmp/user-kyrat-test-home."* ]]; then
+        rm -rf "$HOME"
+    else
+        echo "Error! Tried to remove \"$HOME\", exiting.."
+        exit 1
+    fi
+    unset HOME
 }
 
 function setUpUnitTests(){

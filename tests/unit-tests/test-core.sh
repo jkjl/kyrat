@@ -93,6 +93,8 @@ function test_kyrat(){
     assertEquals 0 $?
     [[ -d $KYRAT_HOME/inputrc.d ]]
     assertEquals 0 $?
+    [[ -d $KYRAT_HOME/symlinkhome ]]
+    assertEquals 0 $?
     [[ -d $KYRAT_HOME/vimrc.d ]]
     assertEquals 0 $?
 }
@@ -136,9 +138,30 @@ function test_execute_ssh_no_opts(){
 }
 
 function test_get_remote_command_no_command(){
-    echo "bashrc" > $KYRAT_HOME/bashrc
-    echo "inputrc" > $KYRAT_HOME/inputrc
-    echo "vimrc" > $KYRAT_HOME/vimrc
+    echo "bashrc" > "$KYRAT_HOME/bashrc"
+    echo "inputrc" > "$KYRAT_HOME/inputrc"
+    echo "vimrc" > "$KYRAT_HOME/vimrc"
+    mkdir "$KYRAT_HOME/symlinkhome"
+    echo "foo" > "$KYRAT_HOME/symlinkhome/foo"
+    echo ".bar" > "$KYRAT_HOME/symlinkhome/.bar"
+    echo "foo bar" > "$KYRAT_HOME/symlinkhome/foo bar"
+    echo "to-be-replaced-with-file" > "$KYRAT_HOME/symlinkhome/to-be-replaced-with-file"
+    echo "to-be-replaced-with-symlink" > "$KYRAT_HOME/symlinkhome/to-be-replaced-with-symlink"
+    echo "to-be-replaced-with-broken-symlink" > "$KYRAT_HOME/symlinkhome/to-be-replaced-with-broken-symlink"
+    ln -s "$KYRAT_HOME/symlinkhome/foo" "$KYRAT_HOME/symlinkhome/convert-foo-symlink-to-file"
+    mkdir "$KYRAT_HOME/symlinkhome/dir_ignore"
+    ln -s "$KYRAT_HOME/not-existing-file" "$KYRAT_HOME/symlinkhome/broken-symlink-ignore"
+    ln -s "$KYRAT_HOME/not-existing-file" "$HOME/old-kyrat-symlink"
+    echo "replaced" > "$KYRAT_HOME/symlinkhome/old-kyrat-symlink"
+    echo "existing file" > "$HOME/existing file"
+    echo "replaced" > "$KYRAT_HOME/symlinkhome/existing file"
+    ln -s "existing file" "$HOME/existing-symlink"
+    echo "replaced" > "$KYRAT_HOME/symlinkhome/existing-symlink"
+    ln -s "/non-existing-path/non-existing-file" "$HOME/existing-broken-symlink"
+    echo "replaced" > "$KYRAT_HOME/symlinkhome/existing-broken-symlink"
+    ln -s "non-existing-file" "$HOME/existing-broken-symlink-relative"
+    echo "replaced" > "$KYRAT_HOME/symlinkhome/existing-broken-symlink-relative"
+
     COMMANDS=()
     bash_func(){
         local kyrat_home=$(echo "$2" | sed 's/\/bashrc//')
@@ -148,6 +171,26 @@ function test_get_remote_command_no_command(){
         assertEquals "vimrc" "$(cat $kyrat_home/vimrc)"
         assertEquals "$kyrat_home/inputrc" "$INPUTRC"
         assertEquals "let \$MYVIMRC=\"$kyrat_home/vimrc\" | source \$MYVIMRC" "$VIMINIT"
+        assertEquals "foo" "$(cat "$kyrat_home/foo")"
+        assertEquals "foo" "$(cat "$HOME/foo")"
+        assertEquals ".bar" "$(cat "$kyrat_home/.bar")"
+        assertEquals ".bar" "$(cat "$HOME/.bar")"
+        assertEquals "foo bar" "$(cat "$HOME/foo bar")"
+        assertEquals "foo" "$(cat "$kyrat_home/convert-foo-symlink-to-file")"
+        assertEquals "foo" "$(cat "$HOME/convert-foo-symlink-to-file")"
+        assertEquals 1 "$([[ -e "$kyrat_home/dir_ignore" ]]; echo $?;)"
+        assertEquals 1 "$([[ -e "$kyrat_home/broken-symlink-ignore" ]]; echo $?;)"
+        assertEquals "replaced" "$(cat "$HOME/old-kyrat-symlink")"
+        assertEquals "existing file" "$(cat "$HOME/existing file")"
+        assertEquals "existing file" "$(cat "$HOME/existing-symlink")"
+        assertEquals 0 "$([[ -L "$HOME/existing-broken-symlink-relative" ]]; echo $?;)"
+        assertEquals 1 "$([[ -e "$HOME/existing-broken-symlink-relative" ]]; echo $?;)"
+        assertEquals 0 "$([[ -L "$HOME/existing-broken-symlink" ]]; echo $?;)"
+        assertEquals 1 "$([[ -e "$HOME/existing-broken-symlink" ]]; echo $?;)"
+        rm -- "$HOME/to-be-replaced-with-file"
+        echo replaced > "$HOME/to-be-replaced-with-file"
+        ln -snf -- "$HOME/existing file" "$HOME/to-be-replaced-with-symlink"
+        ln -snf -- "$HOME/non-existing-file" "$HOME/to-be-replaced-with-broken-symlink"
         echo "$kyrat_home"
     }
     BASH=bash_func
@@ -158,6 +201,31 @@ function test_get_remote_command_no_command(){
     # Check that the kyrat home directory has been removed
     [[ -d "$(cat $STDOUTF)" ]]
     assertEquals 1 $?
+
+    [[ ! -e "$HOME/foo" ]] && [[ ! -L "$HOME/foo" ]]
+    assertTrue "\"$HOME/foo\" should not exist" $?
+    [[ ! -e "$HOME/.bar" ]] && [[ ! -L "$HOME/.bar" ]]
+    assertTrue "\"$HOME/.bar\" should not exist" $?
+    [[ ! -e "$HOME/foo bar" ]] && [[ ! -L "$HOME/foo bar" ]]
+    assertTrue "\"$HOME/foo bar\" should not exist" $?
+    [[ ! -e "$HOME/convert-foo-symlink-to-file" ]] && [[ ! -L "$HOME/convert-foo-symlink-to-file" ]]
+    assertTrue "\"$HOME/convert-foo-symlink-to-file\" should not exist" $?
+    [[ ! -e "$HOME/old-kyrat-symlink" ]] && [[ ! -L "$HOME/old-kyrat-symlink" ]]
+    assertTrue "\"$HOME/old-kyrat-symlink\" should not exist" $?
+    [[ -e "$HOME/existing file" ]]
+    assertTrue "\"$HOME/existing file\" should exist" $?
+    [[ -e "$HOME/existing-symlink" ]]
+    assertTrue "\"$HOME/existing-symlink\" should exist" $?
+    [[ -L "$HOME/existing-broken-symlink" ]] && [[ ! -e "$HOME/existing-broken-symlink" ]]
+    assertTrue "\"$HOME/existing-broken-symlink\" should exist" $?
+    [[ -e "$HOME/existing-symlink" ]]
+    assertTrue "\"$HOME/existing-symlink\" should exist" $?
+    [[ -e "$HOME/to-be-replaced-with-file" ]]
+    assertTrue "\"$HOME/to-be-replaced-with-file\" should exist" $?
+    [[ -e "$HOME/to-be-replaced-with-symlink" ]]
+    assertTrue "\"$HOME/to-be-replaced-with-symlink\" should exist" $?
+    [[ -L "$HOME/to-be-replaced-with-broken-symlink" ]] && [[ ! -e "$HOME/to-be-replaced-with-broken-symlink" ]]
+    assertTrue "\"$HOME/to-be-replaced-with-broken-symlink\" should exist" $?
 }
 
 function test_get_remote_command(){
